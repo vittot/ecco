@@ -13,18 +13,21 @@ Usage:
 
 
 __version__ = '0.0.14'
-from ecco.lm import LM
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel
-from typing import Optional, List
+#from ecco.lm import LM
+from ecco.src.ecco.lm import LM
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel, TFGPT2LMHeadModel
+from typing import Optional, List, Dict
 
 
 def from_pretrained(hf_model_id: str,
+                    model_name: str,
                     activations: Optional[bool] = False,
                     attention: Optional[bool] = False,
                     hidden_states: Optional[bool] = True,
                     activations_layer_nums: Optional[List[int]] = None,
                     verbose: Optional[bool] = True,
-                    gpu: Optional[bool] = True
+                    gpu: Optional[bool] = True,
+                    special_tokens_dict: Optional[Dict] = None
                     ):
     """
 Constructs a [LM][ecco.lm.LM] object based on a string identifier from HuggingFace Transformers. This is main entry point to Ecco.
@@ -48,7 +51,7 @@ Args:
 """
     # TODO: Should specify task/head in a cleaner way. Allow masked LM. T5 generation.
     # Likely use model-config. Have a default. Allow user to specify head?
-    if 'gpt2' not in hf_model_id:
+    if 'gpt2' not in hf_model_id and 'dialogpt' not in hf_model_id:
         tokenizer = AutoTokenizer.from_pretrained(hf_model_id)
         model = AutoModel.from_pretrained(hf_model_id,
                                                      output_hidden_states=hidden_states,
@@ -58,12 +61,19 @@ Args:
         model = AutoModelForCausalLM.from_pretrained(hf_model_id,
                                                      output_hidden_states=hidden_states,
                                                      output_attentions=attention)
+        #model = TFGPT2LMHeadModel.from_pretrained(hf_model_id, from_pt=True,
+                                                     #output_hidden_states=hidden_states,
+                                                     #output_attentions=attention)
+        #special_tokens_dict = {'additional_special_tokens': ['<PATIENT>', '<DOCTOR>']}
+        if special_tokens_dict is not None:
+            tokenizer.add_special_tokens(special_tokens_dict)
+            model.resize_token_embeddings(len(tokenizer))
 
     lm_kwargs = {
-        'model_name': hf_model_id,
+        'model_name': model_name,
         'collect_activations_flag': activations,
         'collect_activations_layer_nums': activations_layer_nums,
         'verbose': verbose,
         'gpu': gpu}
     lm = LM(model, tokenizer, **lm_kwargs)
-    return lm
+    return lm, tokenizer

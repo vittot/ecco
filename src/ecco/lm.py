@@ -1,14 +1,17 @@
 import torch
 import transformers
-import ecco
+#import ecco
+import ecco.src.ecco as ecco
 from torch.nn import functional as F
 import numpy as np
-from ecco.output import OutputSeq
+#from ecco.output import OutputSeq
+from ecco.src.ecco.output import OutputSeq
 import random
 from IPython import display as d
 import os
 import json
-from ecco.attribution import *
+#from ecco.attribution import *
+from ecco.src.ecco.attribution import *
 from typing import Optional, Any, List
 from pprint import pprint
 from operator import attrgetter
@@ -70,6 +73,7 @@ class LM(object):
         self.tokenizer = tokenizer
         self.verbose = verbose
         self._path = os.path.dirname(ecco.__file__)
+       # self._path = os.path.dirname(ecco.src.ecco.__file__)
 
 
         # Neuron Activation
@@ -121,7 +125,29 @@ class LM(object):
         """
         inputs_embeds, token_ids_tensor_one_hot = self._get_embeddings(input_ids)
 
-        output = self.model(inputs_embeds=inputs_embeds, return_dict=True, use_cache=False)
+        output = self.model(inputs_embeds=inputs_embeds, return_dict=True, use_cache=False, output_attentions=False, output_hidden_states=False)
+        #input = transformers.generation_utils.prepare_inputs_for_generation(input_ids)
+
+
+        #attention_mask = input_ids.new_ones(input_ids.shape, dtype=torch.long)
+
+        #if attention_mask is not None:
+        #    # create position_ids on the fly for batch generation
+        #    position_ids = attention_mask.long().cumsum(-1) - 1
+        #    position_ids.masked_fill_(attention_mask == 0, 1)
+
+        #input= {
+        #    "input_ids": input_ids,
+        #    "past_key_values": None,
+        #    "use_cache": None,
+        #    "position_ids": position_ids,
+        #    "attention_mask": attention_mask,
+        #    "token_type_ids": None,
+        #}
+
+        #output = self.model(**input, return_dict=True, output_attentions=False,
+        #                    output_hidden_states=False)
+
         predict = output.logits
 
         scores = predict[-1:, :]
@@ -166,7 +192,8 @@ class LM(object):
 
         return prediction_id, output
 
-    def generate(self, input_str: str,
+    def generate(self, input_str: Optional[str] = None,
+                 input_ids: Optional[str] = None,
                  max_length: Optional[int] = 8,
                  temperature: Optional[float] = None,
                  top_k: Optional[int] = None,
@@ -199,7 +226,12 @@ class LM(object):
             'do_sample']
 
         # We needs this as a batch in order to collect activations.
-        input_ids = self.tokenizer(input_str, return_tensors="pt")['input_ids'][0]
+        if input_ids is None and input_str is not None:
+            input_ids = self.tokenizer(input_str, return_tensors="pt")['input_ids'][0]
+
+        if input_ids is None and input_str is None:
+            raise ValueError("One between input_ids and input_str must have a value")
+
         n_input_tokens = len(input_ids)
         cur_len = n_input_tokens
 

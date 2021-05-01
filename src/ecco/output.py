@@ -1,8 +1,10 @@
 import os
 import json
-import ecco
+# import ecco
+import ecco.src.ecco as ecco
 from IPython import display as d
-from ecco import util, lm_plots
+# from ecco import util, lm_plots
+from ecco.src.ecco import util, lm_plots
 import random
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,6 +43,7 @@ class OutputSeq:
 
 
     """
+
     def __init__(self,
                  token_ids=None,
                  n_input_tokens=None,
@@ -99,6 +102,15 @@ class OutputSeq:
         if self.device == 'cuda':
             return tensor.to('cuda')
         return tensor
+
+    def display(self, data, ipython=True, output_file=None):
+
+        if ipython:
+            d.display(data)
+        if output_file is not None:
+            with open(output_file, "a") as f:
+                f.write('\n')
+                f.write(data)
 
     def explorable(self, printJson: Optional[bool] = False):
 
@@ -179,7 +191,8 @@ class OutputSeq:
         }})""".format(position, data)
         d.display(d.Javascript(js))
 
-    def saliency(self, attr_method: Optional[str] = 'grad_x_input', style="minimal", **kwargs):
+    def saliency(self, attr_method: Optional[str] = 'grad_x_input', style="minimal", ipython=True, output_file=None,
+                 **kwargs):
         """
 Explorable showing saliency of each token generation step.
 Hovering-over or tapping an output token imposes a saliency map on other tokens
@@ -242,8 +255,14 @@ the tokens in the sequence.
             'attributions': [att.tolist() for att in attribution]
         }
 
-        d.display(d.HTML(filename=os.path.join(self._path, "html", "setup.html")))
-        d.display(d.HTML(filename=os.path.join(self._path, "html", "basic.html")))
+        # d.display(d.HTML(filename=os.path.join(self._path, "html", "setup.html")))
+        with open(os.path.join(self._path, "html", "setup.html")) as f:
+            setup_html = f.read()
+        self.display(setup_html, ipython=ipython, output_file=output_file)
+        # d.display(d.HTML(filename=os.path.join(self._path, "html", "basic.html")))
+        with open(os.path.join(self._path, "html", "basic.html")) as f:
+            basic_html = f.read()
+        self.display(basic_html, ipython=ipython, output_file=output_file)
         # viz_id = 'viz_{}'.format(round(random.random() * 1000000))
 
         if (style == "minimal"):
@@ -274,11 +293,17 @@ the tokens in the sequence.
                 console.log(err);
             }})"""
 
-        d.display(d.Javascript(js))
+        # d.display(d.Javascript(js))
+        if not ipython:
+            js = '<script>' + js + '</script>'
+        self.display(js, ipython=ipython, output_file=output_file)
 
         if 'printJson' in kwargs and kwargs['printJson']:
             print(data)
             return data
+
+        if 'returnCode' in kwargs and kwargs['returnCode']:
+            return js
 
     def _repr_html_(self, **kwargs):
         # if util.type_of_script() == "jupyter":
@@ -551,6 +576,7 @@ the tokens in the sequence.
                    collect_activations_layer_nums=self.collect_activations_layer_nums,
                    **kwargs)
 
+
 class NMF:
     """ Conducts NMF and holds the models and components """
 
@@ -613,11 +639,10 @@ class NMF:
         self.activations = np.maximum(activations, 0).T
 
         self.model = decomposition.NMF(n_components=n_components,
-                                  init='random',
-                                  random_state=0,
-                                  max_iter=500)
+                                       init='random',
+                                       random_state=0,
+                                       max_iter=500)
         self.components = self.model.fit_transform(self.activations).T
-
 
     @staticmethod
     def reshape_activations(activations,
@@ -711,7 +736,7 @@ class NMF:
             # Case: Generation. Duplicate value of last input token.
             factors = np.array(
                 [np.concatenate([comp[:self.n_input_tokens], comp[self.n_input_tokens - 1:]]) for comp in
-                  self.components])
+                 self.components])
             factors = [comp.tolist() for comp in factors]  # the json conversion needs this
         else:
             # Case: no generation
@@ -741,8 +766,6 @@ class NMF:
         if 'printJson' in kwargs and kwargs['printJson']:
             print(data)
             return data
-
-
 
     def plot(self, n_components=3):
 
